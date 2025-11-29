@@ -42,3 +42,7 @@ lang/python/src/sourcepp/__init__.py
 lang/python/LICENSE
 lang/python/README.md
 lang/python/THIRDPARTY_LEGAL_NOTICES.txt
+
+#rust
+lang/rust/**/target/
+lang/rust/sourcepp-sys/ext_remote/
