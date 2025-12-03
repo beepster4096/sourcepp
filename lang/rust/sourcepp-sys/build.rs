@@ -6,7 +6,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let sourcepp_path = Path::new("../../.."); // FIXME
+    let sourcepp_path = std::path::absolute(Path::new("../../.."))?; // FIXME
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let all_libraries = [
@@ -25,21 +25,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut cmake = cmake::Config::new(&sourcepp_path);
 
     cmake.define("SOURCEPP_LIBS_START_ENABLED", "OFF");
-    //cmake.always_configure(false); // FIXME
+    cmake.always_configure(false); // FIXME
     for lib in enabled_libraries() {
         cmake.define(format!("SOURCEPP_USE_{}", lib.to_uppercase()), "ON");
     }
 
-    let remote_libs = Path::new("./ext_remote");
+    let vendored = Path::new("./vendored");
+    let provider = sourcepp_path.join("cmake/VendoredDependencyProvider.cmake");
 
-    if fs::exists(remote_libs)? {
-        cmake.define("SOURCEPP_REMOTE_LIBS_SRC", remote_libs.canonicalize()?);
+    if fs::exists(vendored)? {
+        cmake.define("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", provider.canonicalize()?);
+        cmake.define("SOURCEPP_VENDORED_PATH", std::path::absolute(vendored)?); // canonicalize will kill msvc
     }
+
+    cmake.generator("Ninja");
 
     let dst = cmake.build();
 
     println!("cargo:rustc-link-search=native={}", dst.display());
-    println!("cargo:rustc-link-lib=static=foo");
+    println!("cargo:rustc-link-lib=static=sourcepp");
 
     // generate bindings
     let include_dir = sourcepp_path.join("include");
@@ -58,12 +62,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             "-std=c++20",
             &format!("-I{}", include_dir.display()),
             &format!("-I{}", sourcepp_path.join("ext/half/include").display()),
-            &format!("-I{}", remote_libs.join("tsl_hat_trie/include").display()),
-            &format!("-I{}", remote_libs.join("bufferstream/include").display()),
+            &format!("-I{}", vendored.join("tsl_hat_trie/include").display()),
+            &format!("-I{}", vendored.join("bufferstream/include").display()),
         ])
         .allowlist_file(include_dir_regex)
-        //.blocklist_item("std")
-        //.blocklist_item("kvpp::.*")
+        .blocklist_item("const_pointer")
+        .blocklist_item("size_type")
+        .blocklist_item("difference_type")
+        .blocklist_item("pointer")
         .enable_cxx_namespaces()
         .respect_cxx_access_specs(true)
         .default_enum_style(bindgen::EnumVariation::NewType {

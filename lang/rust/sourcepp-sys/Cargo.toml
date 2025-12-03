@@ -3,6 +3,21 @@ name = "sourcepp-sys"
 version = "0.0.0"
 edition = "2024"
 links = "sourcepp"
+include = [
+    "/src",
+    "build.rs",
+    "readme.md",
+    "/vendored",
+    "!.git",
+
+    # these test files are way too big
+    "!/vendored/cryptopp/TestVectors",
+    "!/vendored/cryptopp/TestScripts",
+    "!/miniz/tests",
+    "!/minizip-ng/test",
+    "!/webp/webp_js",
+    "!/webp/tests"
+]
 
 [build-dependencies]
 bindgen = "0.72.1"
