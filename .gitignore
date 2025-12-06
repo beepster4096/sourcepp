@@ -45,4 +45,4 @@ lang/python/THIRDPARTY_LEGAL_NOTICES.txt
 
 #rust
 lang/rust/**/target/
-lang/rust/sourcepp-sys/vendored/
+lang/rust/sourcepp/vendored/

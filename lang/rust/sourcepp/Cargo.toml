@@ -1,10 +1,10 @@
 [package]
-name = "sourcepp-sys"
+name = "sourcepp"
 version = "0.0.0"
 edition = "2024"
-links = "sourcepp"
 include = [
     "/src",
+    "/include",
     "build.rs",
     "readme.md",
     "/vendored",
@@ -20,9 +20,8 @@ include = [
 ]
 
 [build-dependencies]
-bindgen = "0.72.1"
 cmake = "0.1.54"
-regex = { version = "1.12.2", default-features = false }
+cxx-build = "1.0.190"
 
 [features]
 bsppp = []#["vpkpp"]
@@ -37,3 +36,6 @@ toolpp = []#["kvpp"]
 vcryptpp = []
 vpkpp = []#["kvpp"]
 vtfpp = []
+
+[dependencies]
+cxx = { version = "1.0.190", features = ["c++20"] }
