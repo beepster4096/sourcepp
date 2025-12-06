@@ -21,28 +21,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     // but features might be used to configure building in the future
     let enabled_libraries = || features.iter().filter(|f| all_libraries.contains(f));
 
-    // build sourcepp
-    let mut cmake = cmake::Config::new(&sourcepp_path);
-
-    cmake.define("SOURCEPP_LIBS_START_ENABLED", "OFF");
-    //cmake.always_configure(false); // FIXME
-    for lib in enabled_libraries() {
-        cmake.define(format!("SOURCEPP_USE_{}", lib.to_uppercase()), "ON");
-    }
-
     let vendored = Path::new("./vendored");
-    let provider = sourcepp_path.join("cmake/VendoredDependencyProvider.cmake");
 
-    if fs::exists(vendored)? {
-        cmake.define("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", provider.canonicalize()?);
-        cmake.define("SOURCEPP_VENDORED_PATH", std::path::absolute(vendored)?); // canonicalize will kill msvc
+    // build sourcepp
+    if env::var("SOURCEPP_RUST_PLEASE_STOP_REBUILDING_EVERY_TIME").is_err() {
+        let mut cmake = cmake::Config::new(&sourcepp_path);
+
+        cmake.define("SOURCEPP_LIBS_START_ENABLED", "OFF");
+        //cmake.always_configure(false); // FIXME
+        for lib in enabled_libraries() {
+            cmake.define(format!("SOURCEPP_USE_{}", lib.to_uppercase()), "ON");
+        }
+
+        let provider = sourcepp_path.join("cmake/VendoredDependencyProvider.cmake");
+
+        if fs::exists(vendored)? {
+            cmake.define("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", provider.canonicalize()?);
+            cmake.define("SOURCEPP_VENDORED_PATH", std::path::absolute(vendored)?); // canonicalize will kill msvc
+        }
+
+        cmake.generator("Ninja");
+
+        cmake.build();
     }
 
-    cmake.generator("Ninja");
-
-    let dst = cmake.build();
-
-    println!("cargo:rustc-link-search=native={}", dst.join("build").display());
+    println!("cargo:rustc-link-search=native={}", out_dir.join("build").display());
     println!("cargo:rustc-link-lib=static=sourcepp");
 
     // generate bindings
