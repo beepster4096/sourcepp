@@ -55,6 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             vendored.join("tsl_hat_trie/include"),
             vendored.join("bufferstream/include"),
         ])
+        .file("src/shim/vpkpp.cpp")
         .compile("sourcepp-rust");
 
     println!("cargo:rerun-if-changed=src/bridge.rs");

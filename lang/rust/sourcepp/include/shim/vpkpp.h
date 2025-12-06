@@ -6,6 +6,8 @@
 
 namespace vpkpp {
 namespace rust_shims {
+    using c_void = void;
+
     using OpenProperty = PackFile::OpenProperty;
     using OpenPropertyRequest = rust::Fn<rust::Vec<uint8_t>(void* rustCtx, PackFile* packFile, OpenProperty property)>;
 
@@ -35,5 +37,10 @@ namespace rust_shims {
             }
         );
     }
+
+    // forward declared from sourcepp/src/bridge.rs.h
+    struct EntryData;
+
+    EntryData entry_data(const Entry& entry);
 }
 }
