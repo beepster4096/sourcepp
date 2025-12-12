@@ -39,6 +39,8 @@ option(SOURCEPP_BUILD_CSHARP_WRAPPERS "Build C# wrappers for supported libraries
 option(SOURCEPP_BUILD_PYTHON_WRAPPERS "Build Python wrappers for supported libraries" OFF)
 option(SOURCEPP_BUILD_WASM_WRAPPERS   "Build WASM wrappers for supported libraries"   OFF)
 
+option(SOURCEPP_BUILD_FROM_RUST_WRAPPER "Produce metadata for the Rust wrapper's build script" OFF)
+
 option(SOURCEPP_BUILD_BENCHMARKS         "Build benchmarks for supported libraries"  OFF)
 option(SOURCEPP_BUILD_WITH_TBB           "Build with support for std::execution"     OFF)
 option(SOURCEPP_BUILD_WITH_THREADS       "Build with support for threading"           ON)
@@ -174,6 +176,10 @@ if(SOURCEPP_BUILD_WASM_WRAPPERS)
     set(${${PROJECT_NAME}_PYTHON}_DEFINES "")
 endif()
 
+# Rust bindings, part 1
+if(SOURCEPP_BUILD_FROM_RUST_WRAPPER)
+    set(${PROJECT_NAME}_RUST "${PROJECT_NAME}_rust")
+endif()
 
 # Tests, part 1
 if(SOURCEPP_BUILD_TESTS)
@@ -276,6 +282,65 @@ if(SOURCEPP_BUILD_WASM_WRAPPERS)
     target_link_libraries(${${PROJECT_NAME}_WASM} PRIVATE embind ${${${PROJECT_NAME}_WASM}_DEPS})
 endif()
 
+# Rust bindings, part 2
+if(SOURCEPP_BUILD_FROM_RUST_WRAPPER)
+    block(SCOPE_FOR VARIABLES)
+        add_library(${${PROJECT_NAME}_RUST} INTERFACE)
+        target_link_libraries(${${PROJECT_NAME}_RUST} INTERFACE ${${${PROJECT_NAME}_RUST}_DEPS})
+        #install(TARGETS ${${PROJECT_NAME}_RUST})
+
+        set_target_properties(${${PROJECT_NAME}_RUST} PROPERTIES
+            TRANSITIVE_LINK_PROPERTIES "LINK_LIBRARIES"
+        )
+
+        # https://discourse.cmake.org/t/mapping-lists-in-generator-expressions/12833/3
+        function(escape_generator_expression out genexp)
+            string(REPLACE ">" "__ANGLE_R__" ${out} "${genexp}")
+            string(REPLACE "$" "$<1:$>" ${out} "${${out}}")
+            string(REPLACE "," "$<COMMA>" ${out} "${${out}}")
+            string(REPLACE "__ANGLE_R__" "$<ANGLE-R>" ${out} "${${out}}")
+            return(PROPAGATE ${out})
+        endfunction()
+        
+        set(target_condition "$<TARGET_EXISTS:\\1>")
+        set(static_library_condition "$<STREQUAL:$<TARGET_PROPERTY:\\1,TYPE>,STATIC_LIBRARY>")
+        set(map_library "$<$<AND:${target_condition},${static_library_condition}>:#PROPERTY>")
+        escape_generator_expression(map_library_escaped ${map_library})
+
+        set(all_link_libraries "$<TARGET_PROPERTY:${${PROJECT_NAME}_RUST},INTERFACE_LINK_LIBRARIES>")
+
+        set(map_all_static_libraries "$<GENEX_EVAL:$<LIST:TRANSFORM,${all_link_libraries},REPLACE,(.+),${map_library_escaped}>>")
+        set(generic_content "$<JOIN:$<REMOVE_DUPLICATES:${map_all_static_libraries}>,\n>")
+        
+        if(MSVC)
+            # thanks webp
+            set(get_library_name "$<TARGET_FILE_PREFIX:\\1>$<TARGET_FILE_BASE_NAME:\\1>")
+        else()
+            set(get_library_name "$<TARGET_FILE_BASE_NAME:\\1>")
+        endif()
+        set(get_library_dir "$<TARGET_FILE_DIR:\\1>")
+
+        escape_generator_expression(get_library_name_escaped ${get_library_name})
+        escape_generator_expression(get_library_dir_escaped ${get_library_dir})
+
+        string(REPLACE "#PROPERTY" ${get_library_name_escaped} rustc_link_lib_txt_content ${generic_content})
+        string(REPLACE "#PROPERTY" ${get_library_dir_escaped} rustc_link_search_txt_content ${generic_content})
+
+        set(interface_includes "$<TARGET_PROPERTY:${${PROJECT_NAME}_RUST},INTERFACE_INCLUDE_DIRECTORIES>")
+        set(include_txt_content "$<JOIN:$<REMOVE_DUPLICATES:${interface_includes}>,\n>")
+
+        file(GENERATE OUTPUT "$<CONFIG>/rust/rustc_link_lib.txt" CONTENT ${rustc_link_lib_txt_content})
+        file(GENERATE OUTPUT "$<CONFIG>/rust/rustc_link_search.txt" CONTENT ${rustc_link_search_txt_content})
+        file(GENERATE OUTPUT "$<CONFIG>/rust/include.txt" CONTENT ${include_txt_content})
+
+        install(FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/rust/rustc_link_lib.txt"
+            "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/rust/rustc_link_search.txt"
+            "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/rust/include.txt"
+            DESTINATION "$ENV{OUT_DIR}"
+        )
+    endblock()
+endif()
 
 # Print options
 print_options(OPTIONS

@@ -1,7 +1,7 @@
 use std::{
     env,
     error::Error,
-    fs,
+    fs, iter,
     path::{Path, PathBuf},
 };
 
@@ -24,44 +24,51 @@ fn main() -> Result<(), Box<dyn Error>> {
     let vendored = Path::new("./vendored");
 
     // build sourcepp
-    if env::var("SOURCEPP_RUST_PLEASE_STOP_REBUILDING_EVERY_TIME").is_err() {
-        let mut cmake = cmake::Config::new(&sourcepp_path);
+    let mut cmake = cmake::Config::new(&sourcepp_path);
 
-        cmake.define("SOURCEPP_LIBS_START_ENABLED", "OFF");
-        //cmake.always_configure(false); // FIXME
-        for lib in enabled_libraries() {
-            cmake.define(format!("SOURCEPP_USE_{}", lib.to_uppercase()), "ON");
-        }
+    cmake.define("SOURCEPP_LIBS_START_ENABLED", "OFF");
+    cmake.define("SOURCEPP_BUILD_FROM_RUST_WRAPPER", "ON");
 
-        let provider = sourcepp_path.join("cmake/VendoredDependencyProvider.cmake");
+    let target_feature_cfg = env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
 
-        if fs::exists(vendored)? {
-            cmake.define("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", provider.canonicalize()?);
-            cmake.define("SOURCEPP_VENDORED_PATH", std::path::absolute(vendored)?); // canonicalize will kill msvc
-        }
-
-        cmake.generator("Ninja");
-
-        cmake.build();
+    if target_feature_cfg.contains("crt-static") {
+        cmake.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreaded");
+    } else {
+        cmake.define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreadedDLL");
+    }
+    for lib in enabled_libraries() {
+        cmake.define(format!("SOURCEPP_USE_{}", lib.to_uppercase()), "ON");
     }
 
-    println!("cargo:rustc-link-search=native={}", out_dir.join("build").display());
-    println!("cargo:rustc-link-lib=static=sourcepp");
+    let provider = sourcepp_path.join("cmake/VendoredDependencyProvider.cmake");
+
+    if fs::exists(vendored)? {
+        cmake.define("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", provider.canonicalize()?);
+        cmake.define("SOURCEPP_VENDORED_PATH", std::path::absolute(vendored)?); // canonicalize will kill msvc
+    }
+
+    cmake.always_configure(env::var("SOURCEPP_ALWAYS_RECONFIGURE").is_ok());
+
+    cmake.build();
+
+    for lib in fs::read_to_string(out_dir.join("rustc_link_lib.txt"))?.lines() {
+        println!("cargo::rustc-link-lib=static:-bundle={lib}");
+    }
+
+    for path in fs::read_to_string(out_dir.join("rustc_link_search.txt"))?.lines() {
+        println!("cargo::rustc-link-search=native={path}");
+    }
+
+    let include_txt = fs::read_to_string(out_dir.join("include.txt"))?;
 
     // generate bindings
     cxx_build::bridges(["src/bridge.rs"])
         .std("c++20")
-        .includes([
-            PathBuf::from("include"),
-            sourcepp_path.join("include"),
-            sourcepp_path.join("ext/half/include"),
-            vendored.join("tsl_hat_trie/include"),
-            vendored.join("bufferstream/include"),
-        ])
+        .includes(iter::once("include").chain(include_txt.lines()))
         .file("src/shim/vpkpp.cpp")
         .compile("sourcepp-rust");
 
-    println!("cargo:rerun-if-changed=src/bridge.rs");
+    println!("cargo::rerun-if-changed=src/bridge.rs");
 
     Ok(())
 }

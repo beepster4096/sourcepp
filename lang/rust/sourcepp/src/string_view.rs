@@ -1,6 +1,6 @@
 //! https://github.com/dtolnay/cxx/issues/734#issuecomment-825319173
 
-use cxx::{type_id, ExternType};
+use cxx::{ExternType, type_id};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::Deref;

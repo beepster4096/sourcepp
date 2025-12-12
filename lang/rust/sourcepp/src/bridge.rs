@@ -1,6 +1,6 @@
 use std::pin::Pin;
 
-use cxx::{CxxVector, CxxString, UniquePtr};
+use cxx::{CxxString, CxxVector, UniquePtr};
 
 #[cxx::bridge]
 mod ffi {
@@ -23,6 +23,10 @@ mod ffi {
 
         #[cxx_name = "getGUID"]
         fn get_guid(self: &PackFile) -> StringView<'_>;
+
+        //bool hasEntry(const std::string& path, bool includeUnbaked = true) const;
+        #[cxx_name = "hasEntry"]
+        fn has_entry2(self: &PackFile, path: &CxxString, include_unbaked: bool) -> bool;
 
         type Entry;
     }
@@ -64,14 +68,16 @@ mod ffi {
             request_property: unsafe fn(*mut c_void, *mut PackFile, OpenProperty) -> Vec<u8>,
             request_property_ctx: *mut c_void,
         ) -> UniquePtr<PackFile>;
+
+        fn entry_data(entry: &Entry) -> EntryData<'_>;
     }
 }
 
 #[cfg(feature = "vpkpp")]
 pub mod vpkpp {
     use crate::bridge::*;
-    
-    pub use ffi::{PackFile, Entry, EntryData, OpenProperty};
+
+    pub use ffi::{Entry, EntryData, OpenProperty, PackFile};
 
     impl PackFile {
         pub fn open(path: &CxxString) -> UniquePtr<PackFile> {
@@ -93,16 +99,27 @@ pub mod vpkpp {
             unsafe {
                 ffi::open_packfile_with_callbacks(
                     path,
-                    |ctx, path, entry| {
-                        (*ctx.cast::<EntryCallback>())(path, entry)
-                    },
+                    |ctx, path, entry| (*ctx.cast::<EntryCallback>())(path, entry),
                     callback_ctx,
                     |ctx, packfile, property| {
-                        (*ctx.cast::<OpenPropertyRequest>())(Pin::new_unchecked(&mut *packfile), property)
+                        (*ctx.cast::<OpenPropertyRequest>())(
+                            Pin::new_unchecked(&mut *packfile),
+                            property,
+                        )
                     },
                     request_property_ctx,
                 )
             }
+        }
+
+        pub fn has_entry(&self, path: &CxxString) -> bool {
+            self.has_entry2(path, true)
+        }
+    }
+
+    impl Entry {
+        pub fn data(&self) -> EntryData<'_> {
+            ffi::entry_data(self)
         }
     }
 }

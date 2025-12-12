@@ -40,6 +40,11 @@ function(add_sourcepp_library TARGET)
             list(APPEND PROPAGATE_VARS ${${PROJECT_NAME}_WASM}_DEPS ${${PROJECT_NAME}_WASM}_DEFINES ${${PROJECT_NAME}_WASM}_SOURCES)
         endif()
 
+        if(SOURCEPP_BUILD_FROM_RUST_WRAPPER)
+            list(APPEND ${${PROJECT_NAME}_RUST}_DEPS sourcepp::${TARGET})
+            list(APPEND PROPAGATE_VARS ${${PROJECT_NAME}_RUST}_DEPS)
+        endif()
+
         # Add tests
         if(SOURCEPP_BUILD_TESTS AND OPTIONS_TEST)
             list(APPEND ${SOURCEPP_TEST_NAME}_DEPS sourcepp::${TARGET})
