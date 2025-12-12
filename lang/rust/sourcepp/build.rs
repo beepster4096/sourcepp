@@ -62,11 +62,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let include_txt = fs::read_to_string(out_dir.join("include.txt"))?;
 
     // generate bindings
-    cxx_build::bridges(["src/bridge.rs"])
-        .std("c++20")
-        .includes(iter::once("include").chain(include_txt.lines()))
-        .file("src/shim/vpkpp.cpp")
-        .compile("sourcepp-rust");
+    cxx_build::bridges([
+        "src/bridge/sourcepp.rs",
+        "src/bridge/string_view.rs",
+        "src/bridge/span.rs",
+    ])
+    .std("c++20")
+    .includes(iter::once("include").chain(include_txt.lines()))
+    .file("src/shim/vpkpp.cpp")
+    .compile("sourcepp-rust");
 
     println!("cargo::rerun-if-changed=src/bridge.rs");
 

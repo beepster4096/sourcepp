@@ -7,7 +7,7 @@ mod ffi {
     #[namespace = "std"]
     extern "C++" {
         #[cxx_name = "string_view"]
-        type StringView<'a> = crate::string_view::StringView<'a>;
+        type StringView<'a> = super::string_view::StringView<'a>;
     }
 
     #[cfg(feature = "vpkpp")]
@@ -24,7 +24,6 @@ mod ffi {
         #[cxx_name = "getGUID"]
         fn get_guid(self: &PackFile) -> StringView<'_>;
 
-        //bool hasEntry(const std::string& path, bool includeUnbaked = true) const;
         #[cxx_name = "hasEntry"]
         fn has_entry2(self: &PackFile, path: &CxxString, include_unbaked: bool) -> bool;
 
@@ -75,7 +74,7 @@ mod ffi {
 
 #[cfg(feature = "vpkpp")]
 pub mod vpkpp {
-    use crate::bridge::*;
+    use super::*;
 
     pub use ffi::{Entry, EntryData, OpenProperty, PackFile};
 
