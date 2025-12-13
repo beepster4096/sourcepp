@@ -65,7 +65,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     cxx_build::bridges([
         "src/bridge/sourcepp.rs",
         "src/bridge/string_view.rs",
-        "src/bridge/span.rs",
     ])
     .std("c++20")
     .includes(iter::once("include").chain(include_txt.lines()))

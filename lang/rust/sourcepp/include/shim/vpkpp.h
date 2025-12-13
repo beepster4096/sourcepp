@@ -16,11 +16,11 @@ namespace rust_shims {
 	using EntryCallback     = EntryCallbackBase<void>;
 	using EntryPredicate    = EntryCallbackBase<bool>;
 
-    inline std::unique_ptr<PackFile> open_packfile(const std::string& path) {
+    inline std::unique_ptr<PackFile> PackFile_open(const std::string& path) {
         return PackFile::open(path);
     }
 
-    inline std::unique_ptr<PackFile> open_packfile_with_callbacks(const std::string& path, EntryCallback callback, void* callbackCtx, OpenPropertyRequest requestProperty, void* requestPropertyCtx) {
+    inline std::unique_ptr<PackFile> PackFile_open_with_callbacks(const std::string& path, EntryCallback callback, void* callbackCtx, OpenPropertyRequest requestProperty, void* requestPropertyCtx) {
         return PackFile::open(
             path,
             [=](auto path, auto entry) {
@@ -36,6 +36,47 @@ namespace rust_shims {
                 return cppVec;
             }
         );
+    }
+
+    inline std::unique_ptr<Entry> PackFile_find_entry(const PackFile& self, const std::string& path, bool includeUnbaked) {
+        std::optional<Entry> entry_opt = self.findEntry(path, includeUnbaked);
+
+        if (entry_opt) {
+            return std::make_unique<Entry>(entry_opt.value());
+        } else {
+            return nullptr;
+        }
+    }
+
+    inline rust::Vec<uint8_t> PackFile_read_entry(const PackFile& self, const std::string& path, bool& success) {
+        std::optional<std::vector<std::byte>> entry_opt = self.readEntry(path);
+
+        if (entry_opt) {
+            success = true;
+            auto entry_data = entry_opt.value();
+            rust::Vec<uint8_t> vec;
+            std::span<uint8_t> bytes = {reinterpret_cast<uint8_t*>(entry_data.data()), entry_data.size()};
+
+            std::copy(bytes.begin(), bytes.end(), std::back_inserter(vec));
+
+            return vec;
+        } else {
+            success = false;
+            return {};
+        }
+    }
+
+    inline void PackFile_add_entry_from_file_default(PackFile& self, const std::string& entryPath, const std::string& filepath) {
+        self.addEntry(entryPath, filepath);
+    }
+
+    inline void PackFile_add_entry_from_slice(PackFile& self, const std::string& entryPath, rust::Slice<const uint8_t> slice, EntryOptions options) {
+        std::span<const std::byte> bytes = {reinterpret_cast<const std::byte*>(slice.data()), slice.size()};
+        self.addEntry(entryPath, bytes, options);
+    }
+
+    inline void PackFile_add_entry_from_slice_default(PackFile& self, const std::string& entryPath, rust::Slice<const uint8_t> slice) {
+        PackFile_add_entry_from_slice(self, entryPath, slice, {});
     }
 
     // forward declared from sourcepp/src/bridge.rs.h

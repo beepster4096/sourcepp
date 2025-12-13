@@ -1,5 +1,5 @@
 #include "shim/vpkpp.h"
-#include "sourcepp/src/bridge.rs.h"
+#include "sourcepp/src/bridge/sourcepp.rs.h"
 
 using namespace vpkpp;
 using namespace rust_shims;
